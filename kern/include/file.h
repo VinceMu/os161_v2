@@ -10,6 +10,23 @@
  */
 #include <limits.h>
 
+
+struct file {
+	int f_mode;
+	struct vnode *f_vnode;
+	struct lock *f_lock;					
+	off_t f_offset;
+//	int f_refcount;				//use for garbage collection
+        int file_descriptor;//maybe?
+	
+};
+
+struct file_table{
+	struct file *files[OPEN_MAX];
+};
+
+
+
 //variable file length
 int open(const char *filename, int flags,...);
 
