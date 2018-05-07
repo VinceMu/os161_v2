@@ -23,7 +23,7 @@ int open(const char *filename,int flags,mode_t mode,int *)
 {
    struct vnode *file_node; 	
    //intialise file and get response code
-   int response = vfs_open(filename,flags,mode,&file_node);
+   int response = vfs_open(filename,flags,mode,&file_node);//
    if(response)
    {
       return response;
@@ -39,3 +39,6 @@ int open(const char *filename,int flags,mode_t mode,int *)
    */
    return 0;
 } 
+void create_fileTable(){
+     
+}

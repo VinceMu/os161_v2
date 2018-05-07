@@ -14,11 +14,10 @@
 struct file {
 	int f_mode;
 	struct vnode *f_vnode;
-	struct lock *f_lock;					
+	struct lock *f_lock;						
 	off_t f_offset;
-//	int f_refcount;				//use for garbage collection
-        int file_descriptor;//maybe?
-	
+	int f_refcount;				//use for garbage collection
+        int *file_descriptor;//maybe?
 };
 
 struct file_table{
@@ -40,6 +39,7 @@ int close(int fd);
 
 int dup2(int oldfd, int newfd);
 
+int create_filetable(void);
 /*
  * Put your function declarations and data types here ...
  */
