@@ -53,7 +53,43 @@ int open(const char *filename,int flags,mode_t mode,int *file_pointer)
    return 0;
 } 
 
+int close(int fd, int *ret)
+{
+   struct lock *lptr;
+   int flag = 0;
+   if(fd < 0 || fd >= OPEN_MAX){
+      return EBADF;
+   }
 
+   if(curthread->fileTable->file[fd] == NULL) {
+      return EBADF;
+   }
+
+   if(curthread->fileTable->file[fd]->f_vnode == NULL) {
+      return EBADF;
+   }
+// check this sestion
+   struct open* of = curthread->fileTable->file[fd];
+   lock_acquire(of->f_lock);
+   lptr = of->f_lock;
+   of->f_refcount--;
+
+   if(of->refcount == 0){
+      vfs_close(of->vn_ptr);
+      kfree(of);
+      flag = 1;
+   }
+
+   curthread->filetable[fd] = NULL;
+   lock_release(lptr);
+
+   if(flag == 1){
+      lock_destroy(lptr);
+   }
+//
+   *retv = 0;
+   return 0;
+}
 
 void create_fileTable(){
    char* con1 = kstrdup("con:");
