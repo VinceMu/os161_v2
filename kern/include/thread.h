@@ -107,6 +107,7 @@ struct thread {
 	 */
 
 	/* add more here as needed */
+	struct *file_table fileTable;
 };
 
 /*

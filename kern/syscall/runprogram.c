@@ -75,6 +75,10 @@ runprogram(char *progname)
 		return ENOMEM;
 	}
 
+	if(curthread->fileTable == NULL) {
+		create_filetable();
+	}
+
 	/* Switch to it and activate it. */
 	proc_setas(as);
 	as_activate();
