@@ -76,3 +76,78 @@ void create_fileTable(){
    return;
  
 }
+
+int sys_read(int fd, void *buf, size_t buflen, int32_t * retval)
+{
+   struct iovec iov;
+   struct uio io;
+   void *kbuf = kmalloc(sizeof(*buf)*size);
+
+   if(kbuf == NULL) {
+      return EINVAL;
+   }
+
+
+
+   return 0;
+}
+
+int dup2(int oldfd, int newfd, int* ret){
+
+   if (oldfd == newfd){
+      *ret = newfd;
+      return 0;
+    }
+
+   if (oldfd < 0 || oldfd >= OPEN_MAX){
+      return EBADF;
+   }
+
+   if (newfd < 0 || newfd >= OPEN_MAX){
+      return EBADF;
+   }
+
+/*
+   lock_acquire(curthread->fdesc[oldfd]->f_lock);
+   curthread->fdesc[newfd]->flags = curthread->fdesc[oldfd]->flags;
+   curthread->fdesc[newfd]->offset = curthread->fdesc[oldfd]->offset;
+   curthread->fdesc[newfd]->vnode = curthread->fdesc[oldfd]->vnode;
+   *ret = newfd;
+   lock_release(curthread->fdesc[oldfd]->f_lock);
+*/
+
+}
+
+off_t sys_lseek(int fd, off_t pos, int whence, int *ret)
+{
+
+   if(filehandle >= OPEN_MAX || filehandle < 0){
+      return EBADF;
+   }
+/*
+   struct File* fd = curthread->fdesc[filehandle];
+   switch(whence){
+      case SEEK_SET:
+      offset = pos;
+      break;
+
+      case SEEK_CUR:
+      offset = fd->offset + pos;
+      break;
+
+      case SEEK_END:
+      result = VOP_STAT(fd->vnode, &tmp);
+      if(result)
+         return result;
+      offset = tmp.st_size + pos;
+      break;
+
+      default:
+      lock_release(curthread->fdesc[filehandle]->f_lock);
+      return EINVAL;
+   }
+   */
+
+
+}
+
