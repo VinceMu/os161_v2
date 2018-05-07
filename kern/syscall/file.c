@@ -123,15 +123,14 @@ int dup2(int oldfd, int newfd, int* ret){
       return EBADF;
    }
 
-/*
-   lock_acquire(curthread->fdesc[oldfd]->f_lock);
-   curthread->fdesc[newfd]->flags = curthread->fdesc[oldfd]->flags;
-   curthread->fdesc[newfd]->offset = curthread->fdesc[oldfd]->offset;
-   curthread->fdesc[newfd]->vnode = curthread->fdesc[oldfd]->vnode;
+   lock_acquire(curthread->fileTable->file[oldfd]->f_lock);
+   curthread->fileTable->file[newfd]->mode_flag = curthread->fileTable->file[oldfd]->mode_flag;
+   curthread->fileTable->file[newfd]->f_offset = curthread->fileTable->file[oldfd]->f_offset;
+   curthread->fileTable->file[newfd]->f_vnode = curthread->fileTable->file[oldfd]->f_vnode;
    *ret = newfd;
-   lock_release(curthread->fdesc[oldfd]->f_lock);
-*/
-
+   lock_release(curthread->fileTable->file[oldfd]->f_lock);
+   return 0;
+   
 }
 
 off_t sys_lseek(int fd, off_t pos, int whence, int *ret)
