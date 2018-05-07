@@ -40,5 +40,10 @@ int open(const char *filename,int flags,mode_t mode,int *)
    return 0;
 } 
 void create_fileTable(){
-     
+   curthread->fileTable = (struct*file_table)kmalloc(sizeof(struct file_table));
+   if(curthread->file_table == NULL){
+      //could not create file table due to not enough memory
+      return ENOMEM;
+   }
+
 }
