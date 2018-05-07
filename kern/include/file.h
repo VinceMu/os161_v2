@@ -9,15 +9,14 @@
  * Contains some file-related maximum length constants
  */
 #include <limits.h>
-
+#define STARTING_INDEX 3
 
 struct file {
-	int f_mode;
+	int mode_flag;
 	struct vnode *f_vnode;
 	struct lock *f_lock;						
 	off_t f_offset;
 	int f_refcount;				//use for garbage collection
-        int *file_descriptor;//maybe?
 };
 
 struct file_table{

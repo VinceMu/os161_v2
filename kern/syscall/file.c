@@ -15,30 +15,46 @@
 #include <syscall.h>
 #include <copyinout.h>
 
+
 /*
  * Add your file-related functions here ...
  */
 
-int open(const char *filename,int flags,mode_t mode,int *)
+int open(const char *filename,int flags,mode_t mode,int *file_pointer)
 {
-   struct vnode *file_node;
+   if(filename == NULL){
+      return ENOENT;
+   }
+   struct vnode *file_node == NULL;
    //intialise file and get response code
+   int file_index = STARTING_INDEX;
+   while(curthread->fileTable->file[file_index] != NULL){
+      file_index++;
+   }
+   if(file_index >= OPEN_MAX){
+      //file system is file.
+      return EMFILE;
+   }
+
    int response = vfs_open(filename,flags,mode,&file_node);//
+   //error checking
    if(response)
    {
       return response;
    }
-   struct lock *file_lock = lock_create("file_open_lock");
-   if(struct file_lock == NULL)//could not create lock
-   {
-      vfs_close(file_node);
-      return ENOMEM; //return not enough memory error
-   }
-   /**
-   not finished!!!!
-   */
+   curthread->fileTable->mode_flag = flags;
+   curthread->fileTable->f_lock = lock_create(filename);
+   curthread->fileTable->f_vnode = file_node;
+   curthread->fileTable->f_refcount = 1; //should this be 2?
+   curthread->fileTable->f_offset = 0;
+
+   *file_pointer = file_index;//return the index in the file table
+
    return 0;
 } 
+
+
+
 void create_fileTable(){
    char* con1 = kstrdup("con:");
    char* con2 = kstrdup("con:"); //avoid overriding in memory
