@@ -95,12 +95,12 @@ void create_fileTable(){
 
 int sys_read(int fd, void *buf, size_t buflen, int32_t * retval)
 {
+   if(fd < 0 || fd >OPEN_MAX){
+      *retval = -1;
+      return EBADF;
+   }
    struct iovec iov;
    struct uio read_io;
-   void *kbuf = kmalloc(sizeof(*buf)*size);
-   if(kbuf == NULL) {
-      return EINVAL;
-   }
    struct file* open_file = curthread->fileTable->file[fd]; //get table 
  
    //disallow any concurrent modifications
@@ -112,17 +112,41 @@ int sys_read(int fd, void *buf, size_t buflen, int32_t * retval)
       return EBADF;
    }
    char *char_buffer = (char*)kmalloc(size);//our char buffer which holds the characters. 
+   if(char_buffer == NULL) {
+      lock_release(open_file->f_lock);
+      return ENOMEM;
+   }
    uio_kinit(&iov,&read_io,(void*)char_buffer,size,open_file->f_offset,UIO_READ);
    int response = VOP_READ(open_file->f_vnode,&read_io);
-   
+
    if(response){
       lock_release(open_file->f_lock);
       return response;
    }
    open_file->f_offset = read_io.uio_offset;
-   lock_release(open_file->f_vnode);
+   lock_release(open_file->f_lock);
    *retval = buflen - read_io.uio_resid;//amount of bytes read.
    return 0;
+}
+int sys_write(int fd, const void *buf, size_t buflen, int * retval){
+   if(fd < 0 || fd >OPEN_MAX){
+      *retval = -1;
+      return EBADF;
+   }
+   struct iovec iov;
+   struct uio read_io;
+   struct file* write_file = curthread->fileTable->file[fd]; //get table
+
+   lock_acquire(write_file->f_lock);
+   char *char_buffer = (char*)kmalloc(buflen);
+   if(char_buffer == NULL) {
+      lock_release(write_file->f_lock);
+      return ENOMEM;
+   }
+   uio_kinit(&iov,&read_io,(void*)char_buffer,buflen,write_file->offset,UIO_WRITE);
+   /**
+     to continue soon.
+   **/
 }
 
 
@@ -179,7 +203,5 @@ off_t sys_lseek(int fd, off_t pos, int whence, int *ret)
       return EINVAL;
    }
    */
-
-
 }
 
