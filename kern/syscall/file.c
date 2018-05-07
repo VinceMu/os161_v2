@@ -96,17 +96,35 @@ void create_fileTable(){
 int sys_read(int fd, void *buf, size_t buflen, int32_t * retval)
 {
    struct iovec iov;
-   struct uio io;
+   struct uio read_io;
    void *kbuf = kmalloc(sizeof(*buf)*size);
-
    if(kbuf == NULL) {
       return EINVAL;
    }
+   struct file* open_file = curthread->fileTable->file[fd]; //get table 
+ 
+   //disallow any concurrent modifications
+   lock_acquire(open_file->f_lock); 
 
-
-
+   if(ofile->mode == O_WRONLY){
+      //file is empty
+      lock_release(ofile->vnode_lock);
+      return EBADF;
+   }
+   char *char_buffer = (char*)kmalloc(size);//our char buffer which holds the characters. 
+   uio_kinit(&iov,&read_io,(void*)char_buffer,size,open_file->f_offset,UIO_READ);
+   int response = VOP_READ(open_file->f_vnode,&read_io);
+   
+   if(response){
+      lock_release(open_file->f_lock);
+      return response;
+   }
+   open_file->f_offset = read_io.uio_offset;
+   lock_release(open_file->f_vnode);
+   *retval = buflen - read_io.uio_resid;//amount of bytes read.
    return 0;
 }
+
 
 int dup2(int oldfd, int newfd, int* ret){
 
@@ -130,7 +148,6 @@ int dup2(int oldfd, int newfd, int* ret){
    *ret = newfd;
    lock_release(curthread->fileTable->file[oldfd]->f_lock);
    return 0;
-   
 }
 
 off_t sys_lseek(int fd, off_t pos, int whence, int *ret)
