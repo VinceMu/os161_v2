@@ -199,10 +199,10 @@ int sys_write(int fd, const void *buf, size_t buflen, int * retval){
 }
 
 
-int dup2(int oldfd, int newfd, int* ret){
+int dup2(int oldfd, int newfd, int* retval){
 
    if (oldfd == newfd){
-      *ret = newfd;
+      *retval = newfd;
       return 0;
     }
 
@@ -223,34 +223,52 @@ int dup2(int oldfd, int newfd, int* ret){
    return 0;
 }
 
-off_t sys_lseek(int fd, off_t pos, int whence, int *ret)
+off_t sys_lseek(int fd, off_t pos, int whence, int *retval)
 {
-
-   if(filehandle >= OPEN_MAX || filehandle < 0){
+   off_t offset;
+   if(fd >= OPEN_MAX || fd < 0){
       return EBADF;
    }
-/*
-   struct File* fd = curthread->fdesc[filehandle];
+
+   struct file* seek_file = curthread->fileTable[fd];
+   
+   lock_acquire(seek_file->f_lock);
+   if(!VOP_ISSEEKABLE(seek_file->f_vnode)){
+      return ESPIPE;
+   }
    switch(whence){
       case SEEK_SET:
       offset = pos;
       break;
 
       case SEEK_CUR:
-      offset = fd->offset + pos;
+      offset = seek_file->offset + pos;
       break;
 
       case SEEK_END:
-      result = VOP_STAT(fd->vnode, &tmp);
+      result = VOP_STAT(seek_file->f_vnode, &tmp);
       if(result)
          return result;
       offset = tmp.st_size + pos;
       break;
 
       default:
-      lock_release(curthread->fdesc[filehandle]->f_lock);
+      lock_release(seek_file->f_lock);
       return EINVAL;
    }
-   */
+   if(offset <(off_t)0){
+      lock_release(seek_file->f_lock);
+      return EINVAL;
+   }
+   seek_file->f_offset = offset;
+   int response = VOP_TRYSEEK(seek_file->f_vnode, offset);
+   if(response){
+      *retval = -1;
+   }
+   *retval = seek_file->f_offset = offset; 
+   lock_release(seek_file->f_lock);
+   return 0;
+   
 }
+
 
