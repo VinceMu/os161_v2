@@ -150,6 +150,7 @@ int sys_read(int fd, void *buf, size_t buflen, int32_t * retval)
    char *char_buffer = (char*)kmalloc(size);//our char buffer which holds the characters. 
    if(char_buffer == NULL) {
       lock_release(open_file->f_lock);
+      kfree(char_buffer);
       return ENOMEM;
    }
    uio_kinit(&iov,&read_io,(void*)char_buffer,size,open_file->f_offset,UIO_READ);
@@ -157,10 +158,12 @@ int sys_read(int fd, void *buf, size_t buflen, int32_t * retval)
 
    if(response){
       lock_release(open_file->f_lock);
+      kfree(char_buffer);
       return response;
    }
    open_file->f_offset = read_io.uio_offset;
    lock_release(open_file->f_lock);
+   kfree(char_buffer);
    *retval = buflen - read_io.uio_resid;//amount of bytes read.
    return 0;
 }
@@ -170,7 +173,7 @@ int sys_write(int fd, const void *buf, size_t buflen, int * retval){
       return EBADF;
    }
    struct iovec iov;
-   struct uio read_io;
+   struct uio write_io;
    struct file* write_file = curthread->fileTable->file[fd]; //get table
 
    lock_acquire(write_file->f_lock);
@@ -179,10 +182,20 @@ int sys_write(int fd, const void *buf, size_t buflen, int * retval){
       lock_release(write_file->f_lock);
       return ENOMEM;
    }
-   uio_kinit(&iov,&read_io,(void*)char_buffer,buflen,write_file->offset,UIO_WRITE);
-   /**
-     to continue soon.
-   **/
+   uio_kinit(&iov,&write_io,(void*)char_buffer,buflen,write_file->offset,UIO_WRITE);
+   int response = VOP_WRITE(write_file->f_vnode,&write_io); //write operation
+   if (response) {
+      kfree(char_buffer);
+      lock_release(write_file->f_lock);
+      *retval = -1;
+      return response;
+   }
+   write_file->f_offset = write_io.uio_offset;
+   *retval = buflen - write_io.uio_resid;
+   kfree(char_buffer);
+   lock_release(write_file->f_lock); 
+   return 0;
+ 
 }
 
 
