@@ -16,11 +16,8 @@
 #include <copyinout.h>
 
 
-/*
- * Add your file-related functions here ...
- */
 
-int open(const char *filename,int flags,mode_t mode,int *file_pointer)
+int sys_open(const char *filename,int flags,mode_t mode,int *file_pointer)
 {
    if(filename == NULL){
       return ENOENT;
@@ -53,41 +50,40 @@ int open(const char *filename,int flags,mode_t mode,int *file_pointer)
    return 0;
 } 
 
-int close(int fd, int *ret)
+int sys_close(int fd, int *retval)
 {
-   struct lock *lptr;
    int flag = 0;
    if(fd < 0 || fd >= OPEN_MAX){
       return EBADF;
    }
+   struct file* close_file = curthread->fileTable->file[fd];
 
-   if(curthread->fileTable->file[fd] == NULL) {
+   if(close_file == NULL) {
       return EBADF;
    }
 
-   if(curthread->fileTable->file[fd]->f_vnode == NULL) {
+   if(close_file->f_vnode == NULL) {
       return EBADF;
    }
-// check this sestion
-   struct open* of = curthread->fileTable->file[fd];
-   lock_acquire(of->f_lock);
-   lptr = of->f_lock;
-   of->f_refcount--;
+   struct lock* lock_ptr = close_file->f_lock;//to release lock after closing.
 
-   if(of->refcount == 0){
-      vfs_close(of->vn_ptr);
-      kfree(of);
+   lock_acquire(close_file->f_lock);
+   close_file->f_refcount--;
+
+   if(close_file->refcount == 0){
+      vfs_close(close_file->f_vnode);
+      kfree(close_file);
       flag = 1;
    }
 
-   curthread->filetable[fd] = NULL;
-   lock_release(lptr);
+   curthread->fileTable[fd] = NULL;
+   lock_release(lock_ptr);
 
    if(flag == 1){
-      lock_destroy(lptr);
+      lock_destroy(lock_ptr);
    }
 //
-   *retv = 0;
+   *retval = 0;
    return 0;
 }
 
@@ -199,7 +195,7 @@ int sys_write(int fd, const void *buf, size_t buflen, int * retval){
 }
 
 
-int dup2(int oldfd, int newfd, int* retval){
+int sys_dup2(int oldfd, int newfd, int* retval){
 
    if (oldfd == newfd){
       *retval = newfd;
