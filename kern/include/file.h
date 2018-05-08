@@ -26,19 +26,19 @@ struct file_table{
 
 
 //variable file length
-int open(const char *filename, int flags,...);
+int sys_open(const char *filename,int flags,mode_t mode,int *file_pointer);
 
-ssize_t read(int fd, void *buf, size_t buflen);
+ssize_t sys_read(int fd, void *buf, size_t buflen, int32_t * retval);
 
-ssize_t write(int fd, const void *buf, size_t nbytes);
+ssize_t sys_write(int fd, const void *buf, size_t buflen, int * retval);
 
-off_t lseek(int fd, off_t pos, int whence);
+off_t sys_lseek(int fd, off_t pos, int whence, int *ret);
 
-int close(int fd);
+int sys_close(int fd, int *ret);
 
-int dup2(int oldfd, int newfd);
+int sys_dup2(int oldfd, int newfd, int* ret);
 
-int create_filetable(void);
+void create_filetable(void);
 /*
  * Put your function declarations and data types here ...
  */
