@@ -44,7 +44,7 @@
 #include <vfs.h>
 #include <syscall.h>
 #include <test.h>
-
+#include <file.h>
 /*
  * Load program "progname" and start running it in usermode.
  * Does not return except on error.
@@ -76,7 +76,7 @@ runprogram(char *progname)
 	}
 
 	if(curthread->fileTable == NULL) {
-		create_filetable();
+		create_fileTable();
 	}
 
 	/* Switch to it and activate it. */

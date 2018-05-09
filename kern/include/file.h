@@ -26,7 +26,7 @@ struct file_table{
 
 
 //variable file length
-int sys_open(const char *filename,int flags,mode_t mode,int *file_pointer);
+int sys_open(char *filename,int flags,mode_t mode,int *file_pointer);
 
 ssize_t sys_read(int fd, void *buf, size_t buflen, int32_t * retval);
 
@@ -38,7 +38,7 @@ int sys_close(int fd, int *ret);
 
 int sys_dup2(int oldfd, int newfd, int* ret);
 
-void create_filetable(void);
+void create_fileTable(void);
 /*
  * Put your function declarations and data types here ...
  */

@@ -17,7 +17,7 @@
 
 
 
-int sys_open(char *filename,int flags,mode_t mode,int *file_pointer)
+int sys_open(const char *filename,int flags,mode_t mode,int *file_pointer)
 {
    if(filename == NULL){
       return ENOENT;
@@ -33,7 +33,7 @@ int sys_open(char *filename,int flags,mode_t mode,int *file_pointer)
       return EMFILE;
    }
 
-   const int response = vfs_open(filename,flags,mode,&file_node);//
+   int response = vfs_open(filename,flags,mode,&file_node);//
    //error checking
    if(response)
    {
@@ -70,13 +70,13 @@ int sys_close(int fd, int *retval)
    lock_acquire(close_file->f_lock);
    close_file->f_refcount--;
 
-   if(close_file->f_refcount == 0){
+   if(close_file->refcount == 0){
       vfs_close(close_file->f_vnode);
       kfree(close_file);
       flag = 1;
    }
 
-   curthread->fileTable->files[fd] = NULL;
+   curthread->fileTable[fd] = NULL;
    lock_release(lock_ptr);
 
    if(flag == 1){
@@ -87,7 +87,7 @@ int sys_close(int fd, int *retval)
    return 0;
 }
 
-void create_fileTable(void){
+void create_fileTable(){
    char* con1 = kstrdup("con:");
    char* con2 = kstrdup("con:"); //avoid overriding in memory
    struct vnode* node_out = NULL; 
@@ -96,17 +96,17 @@ void create_fileTable(void){
    curthread->fileTable = (struct file_table *)kmalloc(sizeof(struct file_table));
    if(curthread->fileTable == NULL){
       //could not create file table due to not enough memory
-      return;
+      return ENOMEM;
    }
    //just for safety 
-   for(int i=0;i<OPEN_MAX;i++){ 
-     curthread->fileTable->files[i] = (struct file*)kmalloc(sizeof(struct file));
+   for(int i=0;i<OPEN_MAX;i++){ //
+     curthread->fileTable->file[i] = (struct *file)kmalloc(sizeof(struct file));
    }
    vfs_open(con1, O_RDONLY, 0, &node_out);
-   vfs_open(con2,O_RDONLY,0,&node_error);
+   vfs_open(con2,O_RDONLY,0,&node_err);
    if(node_out ==NULL || node_error ==NULL){
       //could not allocate node_out and node_error 
-      return;
+      return ENOMEM;
    }
    //ADD error check after vfs_open
 
@@ -116,7 +116,7 @@ void create_fileTable(void){
    curthread->fileTable->files[1]->f_refcount = 1;
    curthread->fileTable->files[1]->f_lock = lock_create("std_out");
 
-   curthread->fileTable->files[2]->f_vnode = node_error;
+   curthread->fileTable->files[2]->f_vnode = node_err;
    curthread->fileTable->files[2]-> mode_flag = O_WRONLY;
    curthread->fileTable->files[2]->f_offset = 0;
    curthread->fileTable->files[2]->f_refcount = 1;
@@ -138,18 +138,18 @@ int sys_read(int fd, void *buf, size_t buflen, int32_t * retval)
    //disallow any concurrent modifications
    lock_acquire(open_file->f_lock); 
 
-   if(open_file->mode_flag == O_WRONLY){
+   if(open_file->f_mode == O_WRONLY){
       //file is empty
       lock_release(open_file->f_lock);
       return EBADF;
    }
-   char *char_buffer = (char*)kmalloc(buflen);//our char buffer which holds the characters. 
+   char *char_buffer = (char*)kmalloc(size);//our char buffer which holds the characters. 
    if(char_buffer == NULL) {
       lock_release(open_file->f_lock);
       kfree(char_buffer);
       return ENOMEM;
    }
-   uio_kinit(&iov,&read_io,(void*)char_buffer,buflen,open_file->f_offset,UIO_READ);
+   uio_kinit(&iov,&read_io,(void*)char_buffer,size,open_file->f_offset,UIO_READ);
    int response = VOP_READ(open_file->f_vnode,&read_io);
 
    if(response){
@@ -159,7 +159,6 @@ int sys_read(int fd, void *buf, size_t buflen, int32_t * retval)
    }
    open_file->f_offset = read_io.uio_offset;
    lock_release(open_file->f_lock);
-   copyout((const void *)char_buffer, (userptr_t)buf, buflen); //copy out to void * buf
    kfree(char_buffer);
    *retval = buflen - read_io.uio_resid;//amount of bytes read.
    return 0;
@@ -179,7 +178,7 @@ int sys_write(int fd, const void *buf, size_t buflen, int * retval){
       lock_release(write_file->f_lock);
       return ENOMEM;
    }
-   uio_kinit(&iov,&write_io,(void*)char_buffer,buflen,write_file->f_offset,UIO_WRITE);
+   uio_kinit(&iov,&write_io,(void*)char_buffer,buflen,write_file->offset,UIO_WRITE);
    int response = VOP_WRITE(write_file->f_vnode,&write_io); //write operation
    if (response) {
       kfree(char_buffer);
@@ -189,7 +188,6 @@ int sys_write(int fd, const void *buf, size_t buflen, int * retval){
    }
    write_file->f_offset = write_io.uio_offset;
    *retval = buflen - write_io.uio_resid;
-   copyout((const void *)char_buffer, (userptr_t)buf, buflen); //copy out to void * buf
    kfree(char_buffer);
    lock_release(write_file->f_lock); 
    return 0;
@@ -224,14 +222,11 @@ int sys_dup2(int oldfd, int newfd, int* retval){
 off_t sys_lseek(int fd, off_t pos, int whence, int *retval)
 {
    off_t offset;
-   int result;
-   struct stat f_info;
-
    if(fd >= OPEN_MAX || fd < 0){
       return EBADF;
    }
 
-   struct file* seek_file = curthread->fileTable->files[fd];
+   struct file* seek_file = curthread->fileTable[fd];
    
    lock_acquire(seek_file->f_lock);
    if(!VOP_ISSEEKABLE(seek_file->f_vnode)){
@@ -247,11 +242,10 @@ off_t sys_lseek(int fd, off_t pos, int whence, int *retval)
       break;
 
       case SEEK_END:
-      result = VOP_STAT(seek_file->f_vnode, &f_info);//get info of file in this case the size 
-      if(result){
+      result = VOP_STAT(seek_file->f_vnode, &tmp);
+      if(result)
          return result;
-      }
-      offset = f_info.st_size + pos; //as we reached the end move offset by file size
+      offset = tmp.st_size + pos;
       break;
 
       default:
@@ -263,14 +257,13 @@ off_t sys_lseek(int fd, off_t pos, int whence, int *retval)
       return EINVAL;
    }
    seek_file->f_offset = offset;
-  // int response = vop_tryseek(seek_file->f_vnode, offset);
-   //if(response){
-   //   *retval = -1;
-   //}
+   int response = VOP_TRYSEEK(seek_file->f_vnode, offset);
+   if(response){
+      *retval = -1;
+   }
    *retval = seek_file->f_offset = offset; 
    lock_release(seek_file->f_lock);
-   return 0;
-   
+   return 0;   
 }
 
 
