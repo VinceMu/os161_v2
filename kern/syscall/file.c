@@ -99,8 +99,10 @@ void create_fileTable(void){
       return;
    }
    //just for safety 
+   char def_lock_name[] = "file_lock";
    for(int i=0;i<OPEN_MAX;i++){ 
      curthread->fileTable->files[i] = (struct file*)kmalloc(sizeof(struct file));
+     curthread->fileTable->files[i]->f_lock = lock_create(def_lock_name);
    }
    vfs_open(con1, O_RDONLY, 0, &node_out);
    vfs_open(con2,O_RDONLY,0,&node_error);

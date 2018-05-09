@@ -35,7 +35,7 @@
 #include <thread.h>
 #include <current.h>
 #include <syscall.h>
-
+#include <file.h>
 
 /*
  * System call dispatcher.
@@ -132,8 +132,11 @@ syscall(struct trapframe *tf)
 
 		//needs to be fixed
 		case SYS_lseek:
-		err = sys_lseek((int)tf->tf_a0, (off_t)pos, (int)whence, &retval);
+		err = sys_lseek((int)tf->tf_a0, (off_t)tf->tf_a1, (int)tf->tf_a2, &retval);
 		break;
+   //             case SYS__exit:
+ //               err = sys__exit(tf->tf_a0);
+     //           break;
 
 	    default:
 		kprintf("Unknown syscall %d\n", callno);
@@ -178,8 +181,19 @@ syscall(struct trapframe *tf)
  *
  * Thus, you can trash it and do things another way if you prefer.
  */
-void
+/***void
 enter_forked_process(struct trapframe *tf)
 {
 	(void)tf;
+}**/
+void
+enter_forked_process(void *trap,unsigned long dumb)
+{
+	(void)dumb;	
+	struct trapframe *tf;
+	tf = (struct trapframe *) trap;		
+	tf->tf_v0 = 0;
+	tf->tf_a0 = 0;
+	tf->tf_epc = tf->tf_epc + 4;
+	mips_usermode(tf); 
 }

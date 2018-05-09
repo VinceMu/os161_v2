@@ -53,6 +53,14 @@ as_create(void)
 	/*
 	 * Initialize as needed.
 	 */
+        as->as_vbase1 = 0;
+	as->as_npages1 = 0;
+	as->as_vbase2 = 0;
+	as->as_npages2 = 0;
+	as->heaptop=0;
+	as->heapbase=0;
+	as->pid=curthread->pid;
+	return as;
 
 	return as;
 }
