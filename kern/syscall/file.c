@@ -75,14 +75,14 @@ int sys_close(int fd, int *retval)
    if(close_file->f_refcount == 0){
       vfs_close(close_file->f_vnode);
       kfree(close_file);
-      flag = 1;
+      flag = O_WRONLY;
    }else{
       curthread->fileTable->files[fd] = NULL;
    }
 
    lock_release(lock_ptr);
 
-   if(flag == 1){
+   if(flag == O_WRONLY){
       lock_destroy(lock_ptr);
    }
 

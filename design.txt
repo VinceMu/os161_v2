@@ -1,3 +1,28 @@
+OS design document
 
-Vince wuz here
-Place your design document here.
+File Descriptor
+Each individual thread had it’s own file table implemented by a pointer to the file table in the thread struct. This file table consists of a pointer to an array of files. We set a limit of 32 files which is defined as OPEN_MAX. This table is initialised in runprogram(), where stdout and stderr are connected to the console.
+
+Sys_open
+This function checks for the next available slot in the FD table and initialises it by setting up the vnode along with the other parameters as vfs_open is executed. Error checking is done to account for the possible error codes, such as an invalid filename.
+
+Sys_close
+This function will try to close the file handle if it is valid. Then it checks if the reference count of that file is 1 or more. If it is 1, then the whole struct is freed and deleted since it is no longer being used whilst if it is greater than 1, the reference count is decreased by 1.
+
+Sys_write
+This function writes bytes to the file specified at the position specified by the current seek position of the file. VOP_WRITE is used to write the data. The number of bytes written is the value returned. The offset is then updated.
+
+Sys_read
+This function acts in a similar way to sys_write but instead of writing, it reads using the function VOP_READ. The rest is basically the same as above, replacing write with read.
+
+Sys_lseek
+This function changes the current seek position of the file handle finding a new position based on the arguments, returning the new position if successful. Standard error checking needs to be done such as if the file handle is invalid and if it is seekable.
+
+Sys_dup2
+This function clones file handle oldfd to the new file handle newfd. It also checks if the old file handle and the new file handle are valid before cloning it. It also locks it whilst cloning to ensure a successful cloning process without any interruption.
+
+Basic error checking is done in all functions such as checking for valid file handle and valid file names. Locks are also used to prevent unwanted changes from occurring.
+
+syscall
+This function in Syscall.c represents how the kernel syscall interfaces with the rest of the program. In particular we use the struct trapframe to access the registers which are the arguments to the sys calls. 
+Furthermore as lseek uses a 64 bit int return pointer value i.e the off_t type. we had to store the returned off_t type across two int32_t return varibles(retval and ret).  
