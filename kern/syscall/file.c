@@ -243,7 +243,7 @@ int sys_dup2(int oldfd, int newfd, int* retval){
    return 0;
 }
 
-off_t sys_lseek(int fd, off_t pos, int whence, int *retval)
+off_t sys_lseek(int fd, off_t pos, int whence, int64_t *retval)
 {  
    kprintf("started lseek\n");
 
@@ -294,6 +294,7 @@ off_t sys_lseek(int fd, off_t pos, int whence, int *retval)
    //}
    *retval = seek_file->f_offset = offset; 
    lock_release(seek_file->f_lock);
+   kprintf("retaval is %lld \n",*retval);
    kprintf("exited lseek normally\n");
    return 0;
    
