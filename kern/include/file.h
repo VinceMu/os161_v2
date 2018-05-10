@@ -32,7 +32,7 @@ ssize_t sys_read(int fd, void *buf, size_t buflen, int32_t * retval);
 
 ssize_t sys_write(int fd, const void *buf, size_t buflen, int * retval);
 
-off_t sys_lseek(int fd, off_t pos, int whence, int *ret);
+off_t sys_lseek(int fd, off_t pos, int whence, int64_t *ret);
 
 int sys_close(int fd, int *ret);
 

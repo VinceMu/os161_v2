@@ -77,12 +77,13 @@ runprogram(char *progname)
 
 	if(curthread->fileTable == NULL) {
 		create_fileTable();
+             //   kprintf("here!\n");
 	}
-
+	
 	/* Switch to it and activate it. */
 	proc_setas(as);
 	as_activate();
-
+        curthread->t_address_space = proc_getas();
 	/* Load the executable. */
 	result = load_elf(v, &entrypoint);
 	if (result) {

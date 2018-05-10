@@ -19,45 +19,45 @@
 
 int sys_open(char *filename,int flags,mode_t mode,int *file_pointer)
 {
-   kprintf("Start open\n");
    if(filename == NULL){
       return ENOENT;
    }
    struct vnode *file_node = NULL;
    //intialise file and get response code
    int file_index = STARTING_INDEX;
-   while(curthread->fileTable->files[file_index] != NULL){
+
+   while(curthread->fileTable->files[file_index]->f_vnode != NULL){
       file_index++;
    }
+
    if(file_index >= OPEN_MAX){
       //file system is file.
       return EMFILE;
    }
 
-   const int response = vfs_open(filename,flags,mode,&file_node);//
-   //error checking
+   const int response = vfs_open(filename,flags,mode,&file_node);
    if(response)
    {
       return response;
    }
+
    curthread->fileTable->files[file_index]->mode_flag = flags;
    curthread->fileTable->files[file_index]->f_lock = lock_create(filename);
    curthread->fileTable->files[file_index]->f_vnode = file_node;
    curthread->fileTable->files[file_index]->f_refcount = 1; //should this be 2?
    curthread->fileTable->files[file_index]->f_offset = 0;
-
    *file_pointer = file_index;//return the index in the file table
-   kprintf("End open\n");
+   
    return 0;
-} 
+}
 
 int sys_close(int fd, int *retval)
 {
-   kprintf("Start close\n");
    int flag = 0;
    if(fd < 0 || fd >= OPEN_MAX){
       return EBADF;
    }
+
    struct file* close_file = curthread->fileTable->files[fd];
 
    if(close_file == NULL) {
@@ -67,8 +67,8 @@ int sys_close(int fd, int *retval)
    if(close_file->f_vnode == NULL) {
       return EBADF;
    }
-   struct lock* lock_ptr = close_file->f_lock;//to release lock after closing.
 
+   struct lock* lock_ptr = close_file->f_lock;//to release lock after closing.
    lock_acquire(close_file->f_lock);
    close_file->f_refcount--;
 
@@ -76,22 +76,21 @@ int sys_close(int fd, int *retval)
       vfs_close(close_file->f_vnode);
       kfree(close_file);
       flag = 1;
+   }else{
+      curthread->fileTable->files[fd] = NULL;
    }
 
-   curthread->fileTable->files[fd] = NULL;
    lock_release(lock_ptr);
 
    if(flag == 1){
       lock_destroy(lock_ptr);
    }
-//
+
    *retval = 0;
-   kprintf("End close\n");
    return 0;
 }
 
 void create_fileTable(void){
-   kprintf("Start create\n");
    char* con1 = kstrdup("con:");
    char* con2 = kstrdup("con:"); //avoid overriding in memory
    struct vnode* node_out = NULL; 
@@ -105,21 +104,19 @@ void create_fileTable(void){
    //just for safety 
    char def_lock_name[] = "file_lock";
    for(int i=0;i<OPEN_MAX;i++){ 
-      curthread->fileTable->files[i] = (struct file*)kmalloc(sizeof(struct file));
-     // curthread->fileTable->files[i]->f_vnode = NULL;
-    //  curthread->fileTable->files[1]-> mode_flag = NULL;
-    //  curthread->fileTable->files[i]->f_offset = 0;
-    //  curthread->fileTable->files[i]->f_refcount = 0;
-      curthread->fileTable->files[i]->f_lock = lock_create(def_lock_name);
+     curthread->fileTable->files[i] = (struct file*)kmalloc(sizeof(struct file));
+     curthread->fileTable->files[i]->f_lock = lock_create(def_lock_name);
+     curthread->fileTable->files[i]->f_vnode = NULL;
    }
+
    vfs_open(con1, O_RDONLY, 0, &node_out);
    vfs_open(con2,O_RDONLY,0,&node_error);
+
    if(node_out ==NULL || node_error ==NULL){
       //could not allocate node_out and node_error 
       return;
    }
    //ADD error check after vfs_open
-
 
    curthread->fileTable->files[1]->f_vnode = node_out;
    curthread->fileTable->files[1]-> mode_flag = O_WRONLY;
@@ -132,18 +129,18 @@ void create_fileTable(void){
    curthread->fileTable->files[2]->f_offset = 0;
    curthread->fileTable->files[2]->f_refcount = 1;
    curthread->fileTable->files[1]->f_lock = lock_create("std_err");
-   kprintf("End create\n");
+
    return;
  
 }
 
 int sys_read(int fd, void *buf, size_t buflen, int32_t * retval)
 {
-   kprintf("Start read\n");
    if(fd < 0 || fd >OPEN_MAX){
       *retval = -1;
       return EBADF;
    }
+
    struct iovec iov;
    struct uio read_io;
    struct file* open_file = curthread->fileTable->files[fd]; //get table 
@@ -156,12 +153,15 @@ int sys_read(int fd, void *buf, size_t buflen, int32_t * retval)
       lock_release(open_file->f_lock);
       return EBADF;
    }
+
    char *char_buffer = (char*)kmalloc(buflen);//our char buffer which holds the characters. 
+
    if(char_buffer == NULL) {
       lock_release(open_file->f_lock);
       kfree(char_buffer);
       return ENOMEM;
    }
+
    uio_kinit(&iov,&read_io,(void*)char_buffer,buflen,open_file->f_offset,UIO_READ);
    int response = VOP_READ(open_file->f_vnode,&read_io);
 
@@ -170,15 +170,16 @@ int sys_read(int fd, void *buf, size_t buflen, int32_t * retval)
       kfree(char_buffer);
       return response;
    }
+
    open_file->f_offset = read_io.uio_offset;
    lock_release(open_file->f_lock);
    copyout((const void *)char_buffer, (userptr_t)buf, buflen); //copy out to void * buf
    kfree(char_buffer);
    *retval = buflen - read_io.uio_resid;//amount of bytes read.
-   kprintf("End read\n");
    return 0;
+
 }
-/*
+
 int sys_write(int fd, const void *buf, size_t buflen, int * retval){
    if(fd < 0 || fd >= OPEN_MAX) return ENFILE;
    if(curthread->fileTable->files[fd] == NULL) return ENFILE;
@@ -204,7 +205,7 @@ int sys_write(int fd, const void *buf, size_t buflen, int * retval){
    kio.uio_resid = buflen;
    kio.uio_segflg = UIO_USERSPACE;
    kio.uio_rw = UIO_WRITE;
-   kio.uio_space = curthread->t_addrspace;
+   kio.uio_space = curthread->t_address_space;
 
    int ret;
    ret = VOP_WRITE(ofn->f_vnode, &kio);
@@ -220,65 +221,10 @@ int sys_write(int fd, const void *buf, size_t buflen, int * retval){
    * retval = buflen - kio.uio_resid;
    kfree(kbuf);
    return 0;
-}*/
-
-
-int sys_write(int fd, const void *buf, size_t buflen, int * retval){
-   kprintf("Start write\n");
-   char * tmp = (char*)buf;
-   kprintf("tmp1 = %s \n", tmp);
-   if(fd < 0 || fd >OPEN_MAX){
-      *retval = -1;
-      return EBADF;
-   }
-
-   if(!(curthread->fileTable->files[fd]->mode_flag != O_WRONLY || curthread->fileTable->files[fd]->mode_flag != O_RDWR) )
-   {
-      *retval = -1;
-      return EINVAL;
-   }
-
-   struct iovec iov;
-   struct uio write_io;
-   struct file* write_file = curthread->fileTable->files[fd]; //get table
-
-   lock_acquire(write_file->f_lock);
-   char *char_buffer = (char*)kmalloc(buflen);
-   if(char_buffer == NULL) {
-      lock_release(write_file->f_lock);
-      return ENOMEM;
-   }
-   kprintf("char_buffer1 = %s \n", char_buffer);
-   size_t size1;
-   copyinstr((userptr_t)buf,char_buffer,strlen(char_buffer),&size1);
-   kprintf("char_buffer2 = %s \n", char_buffer);
-   uio_kinit(&iov,&write_io,(void*)char_buffer,buflen,write_file->f_offset,UIO_WRITE);
-   int response = VOP_WRITE(write_file->f_vnode,&write_io); //write operation
-   if (response) {
-      kfree(char_buffer);
-      lock_release(write_file->f_lock);
-      *retval = -1;
-      return response;
-   }
-   kprintf("char_buffer3 = %s \n", char_buffer);
-   write_file->f_offset = write_io.uio_offset;
-   *retval = buflen - write_io.uio_resid;
-   //copyout((const void *)char_buffer, (userptr_t)buf, buflen); //copy out to void * buf
-   kprintf("char_buffer4 = %s \n", char_buffer);
-   kfree(char_buffer);
-   lock_release(write_file->f_lock);
-   //char * tmp = (char*)buf;
-   kprintf("tmp2 = %s \n", tmp);
-   kprintf("retval = %d \n", *retval);
-   kprintf("End write\n");
-   return 0;
- 
 }
 
-
-
 int sys_dup2(int oldfd, int newfd, int* retval){
-   kprintf("Start dup2\n");
+
    if (oldfd == newfd){
       *retval = newfd;
       return 0;
@@ -298,13 +244,11 @@ int sys_dup2(int oldfd, int newfd, int* retval){
    curthread->fileTable->files[newfd]->f_vnode = curthread->fileTable->files[oldfd]->f_vnode;
    *retval = newfd;
    lock_release(curthread->fileTable->files[oldfd]->f_lock);
-   kprintf("End dup2\n");
    return 0;
 }
 
-off_t sys_lseek(int fd, off_t pos, int whence, int *retval)
-{
-   kprintf("Start lseek\n");
+off_t sys_lseek(int fd, off_t pos, int whence, int64_t *retval)
+{  
    off_t offset;
    int result;
    struct stat f_info;
@@ -313,8 +257,7 @@ off_t sys_lseek(int fd, off_t pos, int whence, int *retval)
       return EBADF;
    }
 
-   struct file* seek_file = curthread->fileTable->files[fd];
-   
+   struct file* seek_file = curthread->fileTable->files[fd]; 
    lock_acquire(seek_file->f_lock);
    if(!VOP_ISSEEKABLE(seek_file->f_vnode)){
       return ESPIPE;
@@ -345,14 +288,10 @@ off_t sys_lseek(int fd, off_t pos, int whence, int *retval)
       return EINVAL;
    }
    seek_file->f_offset = offset;
-  // int response = vop_tryseek(seek_file->f_vnode, offset);
-   //if(response){
-   //   *retval = -1;
-   //}
    *retval = seek_file->f_offset = offset; 
    lock_release(seek_file->f_lock);
-   kprintf("End lseek\n");
    return 0;
    
 }
+
 
