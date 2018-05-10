@@ -19,20 +19,20 @@
 
 int sys_open(char *filename,int flags,mode_t mode,int *file_pointer)
 {
-   kprintf("started open\n");
+//   kprintf("started open\n");
    if(filename == NULL){
-      kprintf("file name is null\n");
+  //    kprintf("file name is null\n");
       return ENOENT;
    }
    struct vnode *file_node = NULL;
    //intialise file and get response code
    int file_index = STARTING_INDEX;
-   kprintf("before while loop\n");
+  // kprintf("before while loop\n");
    while(curthread->fileTable->files[file_index]->f_vnode != NULL){
-      kprintf("incrementing file_index\n");
+    //  kprintf("incrementing file_index\n");
       file_index++;
    }
-   kprintf("file_index is %d \n",file_index);
+  // kprintf("file_index is %d \n",file_index);
    if(file_index >= OPEN_MAX){
       //file system is file.
       return EMFILE;
@@ -42,7 +42,7 @@ int sys_open(char *filename,int flags,mode_t mode,int *file_pointer)
    //error checking
    if(response)
    {
-      kprintf("received\n");
+   //   kprintf("received\n");
       return response;
    }
    curthread->fileTable->files[file_index]->mode_flag = flags;
@@ -58,7 +58,7 @@ int sys_open(char *filename,int flags,mode_t mode,int *file_pointer)
 
 int sys_close(int fd, int *retval)
 {
-   kprintf("entered close\n");
+   //kprintf("entered close\n");
    int flag = 0;
    if(fd < 0 || fd >= OPEN_MAX){
       return EBADF;
@@ -92,7 +92,7 @@ int sys_close(int fd, int *retval)
    }
 //
    *retval = 0;
-   kprintf("exited close normally\n");
+  // kprintf("exited close normally\n");
    return 0;
 }
 
@@ -245,7 +245,7 @@ int sys_dup2(int oldfd, int newfd, int* retval){
 
 off_t sys_lseek(int fd, off_t pos, int whence, int64_t *retval)
 {  
-   kprintf("started lseek\n");
+  // kprintf("started lseek\n");
 
    off_t offset;
    int result;
@@ -258,7 +258,7 @@ off_t sys_lseek(int fd, off_t pos, int whence, int64_t *retval)
    struct file* seek_file = curthread->fileTable->files[fd];
    
    lock_acquire(seek_file->f_lock);
-   kprintf("lock_acquired\n");
+  // kprintf("lock_acquired\n");
    if(!VOP_ISSEEKABLE(seek_file->f_vnode)){
       return ESPIPE;
    }
@@ -294,8 +294,8 @@ off_t sys_lseek(int fd, off_t pos, int whence, int64_t *retval)
    //}
    *retval = seek_file->f_offset = offset; 
    lock_release(seek_file->f_lock);
-   kprintf("retaval is %lld \n",*retval);
-   kprintf("exited lseek normally\n");
+  // kprintf("retaval is %lld \n",*retval);
+  // kprintf("exited lseek normally\n");
    return 0;
    
 }
