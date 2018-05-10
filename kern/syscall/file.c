@@ -19,15 +19,20 @@
 
 int sys_open(char *filename,int flags,mode_t mode,int *file_pointer)
 {
+   kprintf("started open\n");
    if(filename == NULL){
+      kprintf("file name is null\n");
       return ENOENT;
    }
    struct vnode *file_node = NULL;
    //intialise file and get response code
    int file_index = STARTING_INDEX;
-   while(curthread->fileTable->files[file_index] != NULL){
+   kprintf("before while loop\n");
+   while(curthread->fileTable->files[file_index]->f_vnode != NULL){
+      kprintf("incrementing file_index\n");
       file_index++;
    }
+   kprintf("file_index is %d \n",file_index);
    if(file_index >= OPEN_MAX){
       //file system is file.
       return EMFILE;
@@ -37,6 +42,7 @@ int sys_open(char *filename,int flags,mode_t mode,int *file_pointer)
    //error checking
    if(response)
    {
+      kprintf("received\n");
       return response;
    }
    curthread->fileTable->files[file_index]->mode_flag = flags;
@@ -46,9 +52,9 @@ int sys_open(char *filename,int flags,mode_t mode,int *file_pointer)
    curthread->fileTable->files[file_index]->f_offset = 0;
 
    *file_pointer = file_index;//return the index in the file table
-
+   
    return 0;
-} 
+}
 
 int sys_close(int fd, int *retval)
 {
@@ -103,6 +109,7 @@ void create_fileTable(void){
    for(int i=0;i<OPEN_MAX;i++){ 
      curthread->fileTable->files[i] = (struct file*)kmalloc(sizeof(struct file));
      curthread->fileTable->files[i]->f_lock = lock_create(def_lock_name);
+     curthread->fileTable->files[i]->f_vnode = NULL;
    }
    vfs_open(con1, O_RDONLY, 0, &node_out);
    vfs_open(con2,O_RDONLY,0,&node_error);
@@ -167,37 +174,47 @@ int sys_read(int fd, void *buf, size_t buflen, int32_t * retval)
    return 0;
 }
 int sys_write(int fd, const void *buf, size_t buflen, int * retval){
-   if(fd < 0 || fd >OPEN_MAX){
-      *retval = -1;
-      return EBADF;
-   }
-   struct iovec iov;
-   struct uio write_io;
-   struct file* write_file = curthread->fileTable->files[fd]; //get table
+   if(fd < 0 || fd >= OPEN_MAX) return ENFILE;
+   if(curthread->fileTable->files[fd] == NULL) return ENFILE;
 
-   lock_acquire(write_file->f_lock);
-   char *char_buffer = (char*)kmalloc(buflen);
-   if(char_buffer == NULL) {
-      lock_release(write_file->f_lock);
-      return ENOMEM;
+   struct file* ofn = curthread->fileTable->files[fd];
+   if(ofn->mode_flag == O_RDONLY) return EBADF;
+
+   struct iovec io;
+   struct uio kio;
+
+   void * kbuf = kmalloc(sizeof(* buf) * buflen);
+   if(kbuf == NULL) return EFAULT;
+
+   copyin((const_userptr_t) buf, kbuf, buflen);
+
+   io.iov_ubase = (userptr_t)buf;
+   io.iov_len = buflen;
+
+   lock_acquire(ofn->f_lock);
+   kio.uio_iov = &io;
+   kio.uio_iovcnt = 1;
+   kio.uio_offset = ofn->f_offset;
+   kio.uio_resid = buflen;
+   kio.uio_segflg = UIO_USERSPACE;
+   kio.uio_rw = UIO_WRITE;
+   kio.uio_space = curthread->t_address_space;
+
+   int ret;
+   ret = VOP_WRITE(ofn->f_vnode, &kio);
+   if(ret) {
+      kfree(kbuf);
+      lock_release(ofn->f_lock);
+      * retval = -1;
+      return ret;
    }
-   uio_kinit(&iov,&write_io,(void*)char_buffer,buflen,write_file->f_offset,UIO_WRITE);
-   int response = VOP_WRITE(write_file->f_vnode,&write_io); //write operation
-   if (response) {
-      kfree(char_buffer);
-      lock_release(write_file->f_lock);
-      *retval = -1;
-      return response;
-   }
-   write_file->f_offset = write_io.uio_offset;
-   *retval = buflen - write_io.uio_resid;
-   copyout((const void *)char_buffer, (userptr_t)buf, buflen); //copy out to void * buf
-   kfree(char_buffer);
-   lock_release(write_file->f_lock); 
+
+   ofn->f_offset = kio.uio_offset;
+   lock_release(ofn->f_lock);
+   * retval = buflen - kio.uio_resid;
+   kfree(kbuf);
    return 0;
- 
 }
-
 
 int sys_dup2(int oldfd, int newfd, int* retval){
 
