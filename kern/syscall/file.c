@@ -58,6 +58,7 @@ int sys_open(char *filename,int flags,mode_t mode,int *file_pointer)
 
 int sys_close(int fd, int *retval)
 {
+   kprintf("entered close\n");
    int flag = 0;
    if(fd < 0 || fd >= OPEN_MAX){
       return EBADF;
@@ -80,9 +81,10 @@ int sys_close(int fd, int *retval)
       vfs_close(close_file->f_vnode);
       kfree(close_file);
       flag = 1;
+   }else{
+      curthread->fileTable->files[fd] = NULL;
    }
 
-   curthread->fileTable->files[fd] = NULL;
    lock_release(lock_ptr);
 
    if(flag == 1){
@@ -90,6 +92,7 @@ int sys_close(int fd, int *retval)
    }
 //
    *retval = 0;
+   kprintf("exited close normally\n");
    return 0;
 }
 
@@ -153,7 +156,7 @@ int sys_read(int fd, void *buf, size_t buflen, int32_t * retval)
       return EBADF;
    }
    char *char_buffer = (char*)kmalloc(buflen);//our char buffer which holds the characters. 
-   if(char_buffer == NULL) {
+	   if(char_buffer == NULL) {
       lock_release(open_file->f_lock);
       kfree(char_buffer);
       return ENOMEM;
@@ -241,7 +244,9 @@ int sys_dup2(int oldfd, int newfd, int* retval){
 }
 
 off_t sys_lseek(int fd, off_t pos, int whence, int *retval)
-{
+{  
+   kprintf("started lseek\n");
+
    off_t offset;
    int result;
    struct stat f_info;
@@ -253,6 +258,7 @@ off_t sys_lseek(int fd, off_t pos, int whence, int *retval)
    struct file* seek_file = curthread->fileTable->files[fd];
    
    lock_acquire(seek_file->f_lock);
+   kprintf("lock_acquired\n");
    if(!VOP_ISSEEKABLE(seek_file->f_vnode)){
       return ESPIPE;
    }
@@ -288,6 +294,7 @@ off_t sys_lseek(int fd, off_t pos, int whence, int *retval)
    //}
    *retval = seek_file->f_offset = offset; 
    lock_release(seek_file->f_lock);
+   kprintf("exited lseek normally\n");
    return 0;
    
 }
